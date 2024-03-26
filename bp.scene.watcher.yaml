@@ -1,6 +1,7 @@
 blueprint:
   name: Scene Watcher
   description: Sleduje změny scén. Blueprint 1.0 (build 4)
+  source_url: https://github.com/msigut/ha-blueprint/blob/main/bp.scene.watcher.yaml
   domain: automation
   author: Martin Sigut
 variables:

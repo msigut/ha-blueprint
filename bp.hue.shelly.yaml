@@ -3,6 +3,7 @@ blueprint:
   description: |
     Řízení světel s scén s Philips Hue Dimmer Switch V2 a Shelly relé. Relé je nepovinné.
     Při výběru jsou rovnocenné přímé zadání Světel a Oblasti. Blueprint 1.0 (build 186)
+  source_url: https://github.com/msigut/ha-blueprint/blob/main/bp.hue.shelly.yaml
   domain: automation
   author: Martin Sigut
 
