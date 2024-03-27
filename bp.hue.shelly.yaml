@@ -1,11 +1,12 @@
 blueprint:
-  name: Hue Switch and Shelly - 213
+  name: Hue Switch and Shelly - 215
   description: |
     Řízení světel s scén s Philips Hue Dimmer Switch V2 a Shelly relé. Relé je nepovinné.
-    Při výběru jsou rovnocenné přímé zadání Světel a Oblasti. Blueprint 1.03
+    Při výběru jsou rovnocenné přímé zadání Světel a Oblasti. Blueprint 1.04
     - Hue Off: dvojklik (scéna vypnutí)
     - vícenásobné Relé a těžba Relé ze scény
     - vícenásobné Zóny
+    - Hue Remote nepovinne a Roletka scen nepovinna
   source_url: https://github.com/msigut/ha-blueprint/blob/main/bp.hue.shelly.yaml
   domain: automation
   author: Martin Sigut
@@ -15,6 +16,7 @@ blueprint:
     my_remote:
       name: Dimmer Switch
       description: Philips Hue Dimmer Switch V2 pro zap/vyp, ovládání jasu a scén
+      default: ""
       selector:
         device:
           integration: zha
@@ -62,6 +64,7 @@ blueprint:
     my_scene_selector:
       name: Roletka Scén
       description: Helper - Dropdown pro výběr scén
+      default: ""
       selector:
         entity:
           filter:
