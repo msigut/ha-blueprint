@@ -1,6 +1,6 @@
 blueprint:
   name: Scene Watcher
-  description: Sleduje změny scén. Blueprint 1.0 (build 4)
+  description: Sleduje změny scén. Blueprint 1.0 (build 5)
   source_url: https://github.com/msigut/ha-blueprint/blob/main/bp.scene.watcher.yaml
   domain: automation
   author: Martin Sigut
@@ -14,9 +14,9 @@ condition:
     value_template: "{{ trigger.event.data.entity_id.startswith(scene_prefix) }}"
 action:
   - variables:
-      scene_sel: "{{trigger.event.data.entity_id | replace(scene_prefix,'')}}"
-      scene_cur: "{{trigger.event.data.new_state.state.lower() }}"
-      scene_id: scene.{{scene_sel}}_{{scene_cur}}
+      scene_group: "{{ trigger.event.data.entity_id.split('_')[2] | default('') }}"
+      scene_cur: "{{ trigger.event.data.new_state.state.lower() | default('') }}"
+      scene_id: "scene.{{scene_group}}_{{scene_cur}}"
   - service: scene.turn_on
     data_template:
       entity_id: "{{scene_id}}"
