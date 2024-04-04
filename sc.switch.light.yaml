@@ -1,7 +1,6 @@
 switch_and_light:
   alias: Switch and Light
   description: "Switch and Light works together"
-
   fields:
     switches:
       name: Switches
@@ -51,7 +50,7 @@ switch_and_light:
         # lights
         - if:
             - condition: template
-              value_template: "{{ brightness > 0 }}"
+              value_template: "{{ brightness > 0 and adaptive_lighting | length | int > 0 }}"
           # power enable
           then:
             - service: adaptive_lighting.set_manual_control
