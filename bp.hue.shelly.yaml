@@ -1,21 +1,18 @@
 blueprint:
-  name: Hue Switch and Shelly - 215
+  name: Hue Switch and Shelly - 221
   description: |
-    Řízení světel s scén s Philips Hue Dimmer Switch V2 a Shelly relé. Relé je nepovinné.
-    Při výběru jsou rovnocenné přímé zadání Světel a Oblasti. Blueprint 1.04
-    - Hue Off: dvojklik (scéna vypnutí)
-    - vícenásobné Relé a těžba Relé ze scény
-    - vícenásobné Zóny
-    - Hue Remote nepovinne a Roletka scen nepovinna
+    Control Lights and Reles by Philips Hue Dimmer Switch V2 and Shelly.
+    Blueprint 1.05
+    - using Script ; call script.switch_and_light
   source_url: https://github.com/msigut/ha-blueprint/blob/main/bp.hue.shelly.yaml
   domain: automation
   author: Martin Sigut
 
   input:
-    # Hue dalkove ovladani
+    # Hue Dimmer Switch
     my_remote:
       name: Dimmer Switch
-      description: Philips Hue Dimmer Switch V2 pro zap/vyp, ovládání jasu a scén
+      description: Philips Hue Dimmer Switch V2
       default: ""
       selector:
         device:
@@ -25,8 +22,8 @@ blueprint:
             device_class: battery
     # tlacitka
     my_button:
-      name: Tlačítko
-      description: Shelly tlačítko propojené na Přepínač pro zapínání/vypínání soustavy
+      name: Shelly switch
+      description: Shelly switch
       default: ""
       selector:
         device:
@@ -34,8 +31,8 @@ blueprint:
           multiple: false
     # prepinace
     my_rele:
-      name: Přepínač
-      description: Relé pro zapínání/vypínání soustavy
+      name: Switch
+      description: Switches to control
       default: []
       selector:
         entity:
@@ -43,59 +40,27 @@ blueprint:
           multiple: true
     # svetla
     my_light:
-      name: Světla
-      description: Výběr světel
+      name: Lights
+      description: Lights to control
       default: []
       selector:
         entity:
           domain: light
           multiple: true
-    # oblasti
-    my_area:
-      name: Oblasti
-      description: Výběr oblasti
-      default: []
-      selector:
-        area:
-          entity:
-            integration: zha
-          multiple: true
     # Helper - DropDown pro vyber scen
     my_scene_selector:
-      name: Roletka Scén
-      description: Helper - Dropdown pro výběr scén
+      name: Scene selector
+      description: Helper - Dropdown as Scene selector
       default: ""
       selector:
         entity:
           filter:
             domain:
               - input_select
-    # nastaveni: startovaci teplota
-    start_kelvin_hue:
-      name: Teplota světla pro zapnutí
-      description: Teplota se uloží před vypnutím světla, je aktivována po zapnutí
-      default: 200
-      selector:
-        number:
-          min: 153
-          max: 454
-          mode: slider
-          step: 1
-    # nastaveni: startovaci teplota
-    start_level_hue:
-      name: Jas světla pro zapnutí
-      description: Jas se uloží před vypnutím světla, je aktivován po zapnutí
-      default: 50
-      selector:
-        number:
-          min: 0
-          max: 255
-          mode: slider
-          step: 1
-    # nastaveni: vychozi jas
+    # nastaveni: High Brightness
     brightness_default:
-      name: Výchozí jas
-      description: Pevný výchozí jas nastavený při rychlém zapnutí (dvojklik - Hue On)
+      name: Default Brightness in %
+      description: Default Brightness for Power Enable (long-press - Hue On)
       default: 80
       selector:
         number:
@@ -105,8 +70,8 @@ blueprint:
           step: 10
     # nastaveni: krok jasu
     brightness_step:
-      name: Krok jasu v %
-      description: Krok jasu v procentech po kterém je zvyšován nebo snižován jan (klik / držení - Hue Up / Down)
+      name: Brightness Step in %
+      description: Brightness Step in %  (click / hold - Hue Up / Down)
       default: 10
       selector:
         number:
@@ -116,8 +81,8 @@ blueprint:
           step: 5
     # nastaveni: cas zmeny
     transition:
-      name: Doba změn
-      description: Čas změny v sekundách (použito ve všech operacích)
+      name: Transition in sec
+      description: Transition time (used in all operations)
       default: 1.0
       selector:
         number:
@@ -129,36 +94,22 @@ blueprint:
 mode: single
 
 variables:
-  # zakladni ridici promenne
+  # main
   my_rele: !input my_rele
   my_light: !input my_light
-  my_area: !input my_area
   my_scene_selector: !input my_scene_selector
-  start_kelvin_hue: !input start_kelvin_hue
-  start_level_hue: !input start_level_hue
-  # jas a zmena
+  # brightness and transition
   brightness_default: !input brightness_default
   brightness_step: !input brightness_step
   brightness_step_fast: "{{ brightness_step * 2 }}"
   transition: !input transition
-  # sceny
+  # scenes
   scene_group: "{{ my_scene_selector.split('_')[2] | default('') }}"
   scene_off: "scene.{{scene_group}}_off"
-  # zony (entity ze vsech zon)
-  zone_all: |
-    {% set res = namespace(list=[]) %}
-    {% for area in my_area %}
-    {%   set res.list = res.list + (area_entities(area) | list) %}
-    {% endfor %}
-    {{ res.list }}
-  # svetla & rele
-  lights: "{{ (zone_all + my_light) | select('match', 'light') | unique | list }}"
-  reles: "{{ (zone_all + my_rele) | select('match', 'switch') | unique | list }}"
-  # vyber startovaci teploty a jasu
-  start_kelvin: "{{ expand(zone_all + my_light) | select('search', 'start_up_color_temperature') | map(attribute='entity_id') | unique | list }}"
-  start_level: "{{ expand(zone_all + my_light) | select('search', 'start_up_current_level') | map(attribute='entity_id') | unique | list }}"
+  # lights
+  light_on: "{{ states.light | selectattr('entity_id', 'in', my_light) | selectattr('state','eq','on') | map(attribute='entity_id') | list }}"
+  light_on_count: "{{ light_on | count }}"
 
-# obecne vsechny udalosti na danem zarizeni
 trigger:
   - platform: event
     event_type: zha_event
@@ -172,165 +123,86 @@ trigger:
 
 action:
   - variables:
-      # prikaz
       command: "{{ trigger.event.data.command | default('') }}"
       click: "{{ trigger.event.data.click_type | default('') }}"
-      # bio-rytmus (teplota a jas)
-      circadian_kelvin: "{{ state_attr('sensor.circadian_values', 'colortemp') | int(0) }}"
-      circadian_level_pct: "{{ (100 + (states.sensor.circadian_values.state | int(0))) / 2 }}"
-      # sepnute rele
-      rele_on: "{{ states.switch | selectattr('entity_id', 'in', reles) | selectattr('state', 'eq', 'on') | map(attribute='entity_id') | list }}"
-      rele_off: "{{ states.switch | selectattr('entity_id', 'in', reles) | selectattr('state', 'eq', 'off') | map(attribute='entity_id') | list }}"
-      rele_on_count: "{{ rele_on | count }}"
-      rele_off_count: "{{ rele_off | count }}"
-      # zapnuta svetla
-      light_on: "{{ states.light | selectattr('entity_id', 'in', lights) | selectattr('state', 'eq', 'on') | map(attribute='entity_id') | list }}"
-      light_off: "{{ states.light | selectattr('entity_id', 'in', lights) | selectattr('state', 'eq', 'off') | map(attribute='entity_id') | list }}"
-      light_on_count: "{{ light_on | count }}"
-      light_off_count: "{{ light_off | count }}"
-
-  - service: logbook.log
-    data:
-      name: HueShelly
-      message: "{{iif(light_on_count == 0 , 'Off', 'On')}} [{{light_on_count}}] | Switch: {{iif(rele_on_count == 0, 'Off', 'On')}} [{{rele_on_count}}] | Command & click_type: [{{command}} / {{click}}] | Lights: {{lights}} | Reles: {{reles}} | Off scene: {{scene_off}}"
 
   - choose:
-      # zapnuti
-      - conditions: "{{ command == 'on_press' or click == 'single_push' }}"
+      # Enable / disable
+      - conditions: "{{ command == 'on_short_release' or click == 'single_push' }}"
         sequence:
-          # zapnuti
-          - if:
-              - condition: template
-                value_template: "{{ light_off_count > 0 }}"
-            then:
-              # zapnuti rele
-              - if:
-                  - condition: template
-                    value_template: "{{ rele_off_count > 0 }}"
-                then:
-                  - service: switch.turn_on
-                    target:
-                      entity_id: "{{rele_off}}"
-              # zapnuti
-              - service: light.turn_on
-                target:
-                  entity_id: "{{lights}}"
-                data:
-                  kelvin: "{{circadian_kelvin}}"
-                  brightness_pct: "{{circadian_level_pct}}"
-                  transition: "{{transition}}"
-              - service: logbook.log
-                data:
-                  name: HueShelly
-                  message: "ON {{iif(light_off_count > 0,'+SWITCH','-')}} | Settings: Circadian [{{circadian_kelvin}}/{{circadian_level_pct}}] | Transition: [{{transition}}]"
-            # vypnuti
-            else:
-              # start: teplota
-              - service: number.set_value
-                target:
-                  entity_id: "{{start_kelvin}}"
-                data:
-                  value: "{{start_kelvin_hue}}"
-              # start: jas
-              - service: number.set_value
-                target:
-                  entity_id: "{{start_level}}"
-                data:
-                  value: "{{start_level_hue}}"
-              # vypnuti svetla
-              - service: light.turn_off
-                target:
-                  entity_id: "{{lights}}"
-                data:
-                  transition: "{{transition}}"
-              # vypnuti rele
-              - if:
-                  - condition: template
-                    value_template: "{{ rele_on_count > 0 }}"
-                then:
-                  - service: switch.turn_off
-                    target:
-                      entity_id: "{{rele_on}}"
-              - service: logbook.log
-                data:
-                  name: HueShelly
-                  message: "OFF {{iif(rele_on_count > 0,'-SWITCH','-')}} | Settings: Temp: [{{start_kelvin_hue}} / {{start_kelvin | count}}] Level: [{{start_level_hue}} / {{start_level | count}}] | Transition: [{{transition}}]"
-      # silove zapnuti (do zakladniho jasu)
-      - conditions: "{{ command == 'on_double_press' or click == 'long_push' }}"
-        sequence:
-          # zapnuti rele
-          - if:
-              - condition: template
-                value_template: "{{ rele_off_count > 0 }}"
-            then:
-              - service: switch.turn_on
-                target:
-                  entity_id: "{{rele_off}}"
-          # rychle zapnuti svetla
-          - service: light.turn_on
-            target:
-              entity_id: "{{lights}}"
+          - service: script.switch_and_light
             data:
-              kelvin: "{{circadian_kelvin}}"
-              brightness_pct: "{{brightness_default}}"
-              transition: "{{transition}}"
+              switches: "{{my_rele}}"
+              lights: "{{my_light}}"
           - service: logbook.log
             data:
               name: HueShelly
-              message: "ON-DIRECT +SWITCH | Settings: Circadian [{{ circadian_kelvin }}] | Brightness [{{brightness_default}}] | Transition: [{{transition}}]"
-      # zvyseni jasu
+              message: "ON / OFF"
+      # Power enable
+      - conditions: "{{ command == 'on_long_release' or click == 'long_push' }}"
+        sequence:
+          - service: script.switch_and_light
+            data:
+              switches: "{{my_rele}}"
+              lights: "{{my_light}}"
+              brightness: "{{brightness_default}}"
+          - service: logbook.log
+            data:
+              name: HueShelly
+              message: "ON-DIRECT | Brightness [{{brightness_default}}]"
+      # Brightness up
       - conditions: "{{ command == 'up_press' and light_on_count > 0 }}"
         sequence:
           - service: light.turn_on
             target:
-              entity_id: "{{lights}}"
+              entity_id: "{{my_light}}"
             data:
               brightness_step_pct: "+{{brightness_step}}"
               transition: "{{transition}}"
           - service: logbook.log
             data:
               name: HueShelly
-              message: "Hue BRIGHT UP | Settings: Step: [+{{brightness_step}}%] | Transition: [{{transition}}]"
-      # snizeni jasu
+              message: "Hue BRIGHT UP | Step: [+{{brightness_step}}%] | Transition: [{{transition}}]"
+      # Brightness down
       - conditions: "{{ command == 'down_press' and light_on_count > 0 }}"
         sequence:
           - service: light.turn_on
             target:
-              entity_id: "{{lights}}"
+              entity_id: "{{my_light}}"
             data:
               brightness_step_pct: "-{{brightness_step}}"
               transition: "{{transition}}"
           - service: logbook.log
             data:
               name: HueShelly
-              message: "Hue BRIGHT DOWN | Settings: Step: [-{{brightness_step}}%] | Transition: [{{transition}}]"
-      # rychle zvyseni jasu
+              message: "Hue BRIGHT DOWN | Step: [-{{brightness_step}}%] | Transition: [{{transition}}]"
+      # Fast Brightness up
       - conditions: "{{ command == 'up_hold' and light_on_count > 0 }}"
         sequence:
           - service: light.turn_on
             target:
-              entity_id: "{{lights}}"
+              entity_id: "{{my_light}}"
             data:
               brightness_step_pct: "+{{brightness_step_fast}}"
               transition: "{{transition}}"
           - service: logbook.log
             data:
               name: HueShelly
-              message: "Hue BRIGHT UP FAST | Settings: Step: [+{{brightness_step_fast}}%] | Transition: [{{transition}}]"
-      # rychle snizeni jasu
+              message: "Hue BRIGHT UP FAST | Step: [+{{brightness_step_fast}}%] | Transition: [{{transition}}]"
+      # Fast Brightness down
       - conditions: "{{ command == 'down_hold' and light_on_count > 0 }}"
         sequence:
           - service: light.turn_on
             target:
-              entity_id: "{{lights}}"
+              entity_id: "{{my_light}}"
             data:
               brightness_step_pct: "-{{brightness_step_fast}}"
               transition: "{{transition}}"
           - service: logbook.log
             data:
               name: HueShelly
-              message: "Hue BRIGHT DOWN FAST | Settings: Step: [-{{brightness_step_fast}}%] | Transition: [{{transition}}]"
-      # zmena sceny
+              message: "Hue BRIGHT DOWN FAST | Step: [-{{brightness_step_fast}}%] | Transition: [{{transition}}]"
+      # Scene next
       - conditions: "{{ command == 'off_press' }}"
         sequence:
           - service: input_select.select_next
@@ -342,7 +214,7 @@ action:
             data:
               name: HueShelly
               message: "Hue SCENE NEXT"
-      # scena vypnuti
+      # Scene off
       - conditions: "{{ command == 'off_double_press' and light_on_count > 0 }}"
         sequence:
           - service: scene.turn_on

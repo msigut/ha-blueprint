@@ -1,0 +1,92 @@
+switch_and_light:
+  alias: Switch and Light
+  description: "Switch and Light works together"
+
+  fields:
+    switches:
+      name: Switches
+      description: All my switches to check status and turn on/off
+      required: true
+    lights:
+      name: Lights
+      description: All my lights to turn on/off
+      required: true
+    brightness:
+      name: Brightness
+      description: Brightness empowered for on
+      required: false
+      default: 0
+
+  sequence:
+    - variables:
+        transition: 1
+        adaptive_lighting: "{{ states.switch | map(attribute='entity_id') | select('search', 'adaptive_lighting') | reject('search', '_update') | reject('search', '_mode') | reject('search', '_color') | reject('search', '_brightness') | list | first | default('') }}"
+        switch_on: "{{ states.switch | selectattr('entity_id', 'in', switches) | selectattr('state','eq','on') | map(attribute='entity_id') | list }}"
+        switch_off: "{{ states.switch | selectattr('entity_id', 'in', switches) | selectattr('state','eq','off') | map(attribute='entity_id') | list }}"
+        switch_on_count: "{{ switch_on | count }}"
+        switch_off_count: "{{ switch_off | count }}"
+        light_on: "{{ states.light | selectattr('entity_id', 'in', lights) | selectattr('state','eq','on') | map(attribute='entity_id') | list }}"
+        light_off: "{{ states.light | selectattr('entity_id', 'in', lights) | selectattr('state','eq','off') | map(attribute='entity_id') | list }}"
+        light_on_count: "{{ light_on | count }}"
+        light_off_count: "{{ light_off | count }}"
+
+    - service: logbook.log
+      data:
+        name: SwitchLight
+        message: "Switch [{{switch_on_count}} / {{switch_off_count}}] | Light [{{light_on_count}} / {{light_off_count}}] | Brightness [{{brightness}}]"
+
+    # enable
+    - if:
+        - condition: template
+          value_template: "{{ light_off_count > 0 }}"
+      then:
+        # switch
+        - if:
+            - condition: template
+              value_template: "{{ switch_off_count > 0 }}"
+          then:
+            - service: switch.turn_on
+              target:
+                entity_id: "{{switch_off}}"
+        # lights
+        - if:
+            - condition: template
+              value_template: "{{ brightness > 0 }}"
+          # power enable
+          then:
+            - service: adaptive_lighting.set_manual_control
+              data:
+                entity_id: "{{adaptive_lighting}}"
+                lights: "{{ light_off }}"
+                manual_control: true
+            - service: light.turn_on
+              target:
+                entity_id: "{{light_off}}"
+              data:
+                brightness_pct: "{{brightness}}"
+                transition: "{{transition}}"
+          # common enable
+          else:
+            - service: light.turn_on
+              target:
+                entity_id: "{{light_off}}"
+              data:
+                transition: "{{transition}}"
+      # disable
+      else:
+        # lights
+        - service: light.turn_off
+          target:
+            entity_id: "{{light_on}}"
+          data:
+            transition: "{{transition}}"
+        # switch
+        - if:
+            - condition: template
+              value_template: "{{ switch_on_count > 0 }}"
+          then:
+            - service: switch.turn_off
+              target:
+                entity_id: "{{switch_on}}"
+
+  mode: single
