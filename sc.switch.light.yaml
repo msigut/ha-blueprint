@@ -18,21 +18,28 @@ switch_and_light:
 
   sequence:
     - variables:
+        # main
         transition: 1
         adaptive_lighting: "{{ states.switch | map(attribute='entity_id') | select('search', 'adaptive_lighting') | reject('search', '_update') | reject('search', '_mode') | reject('search', '_color') | reject('search', '_brightness') | list | first | default('') }}"
+        # switches
         switch_on: "{{ states.switch | selectattr('entity_id', 'in', switches) | selectattr('state','eq','on') | map(attribute='entity_id') | list }}"
         switch_off: "{{ states.switch | selectattr('entity_id', 'in', switches) | selectattr('state','eq','off') | map(attribute='entity_id') | list }}"
         switch_on_count: "{{ switch_on | count }}"
         switch_off_count: "{{ switch_off | count }}"
+        # lights
         light_on: "{{ states.light | selectattr('entity_id', 'in', lights) | selectattr('state','eq','on') | map(attribute='entity_id') | list }}"
         light_off: "{{ states.light | selectattr('entity_id', 'in', lights) | selectattr('state','eq','off') | map(attribute='entity_id') | list }}"
         light_on_count: "{{ light_on | count }}"
         light_off_count: "{{ light_off | count }}"
+        # brightness
+        brightness: "{{ brightness | default(0) }}"
+        brightness_pct: "{{ iif( brightness > 0, brightness, state_attr(adaptive_lighting, 'brightness_pct') | int(0) ) }}"
+        color_temp_kelvin: "{{ state_attr(adaptive_lighting, 'color_temp_kelvin') | int(0) }}"
 
     - service: logbook.log
       data:
         name: SwitchLight
-        message: "Switch [{{switch_on_count}} / {{switch_off_count}}] | Light [{{light_on_count}} / {{light_off_count}}] | Brightness [{{brightness}}]"
+        message: "Switch [{{switch_on_count}} / {{switch_off_count}}] | Light [{{light_on_count}} / {{light_off_count}}]"
 
     # enable
     - if:
@@ -50,7 +57,7 @@ switch_and_light:
         # lights
         - if:
             - condition: template
-              value_template: "{{ brightness > 0 and adaptive_lighting | length | int > 0 }}"
+              value_template: "{{ brightness_pct > 0 and color_temp_kelvin > 0 }}"
           # power enable
           then:
             - service: adaptive_lighting.set_manual_control
@@ -62,8 +69,13 @@ switch_and_light:
               target:
                 entity_id: "{{light_off}}"
               data:
-                brightness_pct: "{{brightness}}"
+                kelvin: "{{color_temp_kelvin}}"
+                brightness_pct: "{{brightness_pct}}"
                 transition: "{{transition}}"
+            - service: logbook.log
+              data:
+                name: SwitchLight
+                message: "Brightness [{{brightness_pct}}] | Kelvin [{{color_temp_kelvin}}]"
           # common enable
           else:
             - service: light.turn_on
@@ -87,5 +99,4 @@ switch_and_light:
             - service: switch.turn_off
               target:
                 entity_id: "{{switch_on}}"
-
   mode: single
