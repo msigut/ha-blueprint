@@ -57,7 +57,7 @@ switch_and_light:
         # lights
         - if:
             - condition: template
-              value_template: "{{ brightness_pct > 0 and color_temp_kelvin > 0 }}"
+              value_template: "{{ brightness > 0 }}"
           # power enable
           then:
             - service: adaptive_lighting.set_manual_control
@@ -65,6 +65,11 @@ switch_and_light:
                 entity_id: "{{adaptive_lighting}}"
                 lights: "{{ light_off }}"
                 manual_control: true
+        - if:
+            - condition: template
+              value_template: "{{ brightness_pct > 0 and color_temp_kelvin > 0 }}"
+          # enable Adaptive lighting
+          then:
             - service: light.turn_on
               target:
                 entity_id: "{{light_off}}"
@@ -99,4 +104,5 @@ switch_and_light:
             - service: switch.turn_off
               target:
                 entity_id: "{{switch_on}}"
+                
   mode: single
