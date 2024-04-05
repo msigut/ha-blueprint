@@ -12,9 +12,22 @@ switch_and_light:
       required: true
     brightness:
       name: Brightness
-      description: Brightness empowered for on
+      description: Brightness empowered for on [0]
       required: false
       default: 0
+      example: 80
+    start_kelvin:
+      name: Start-up Kelvin
+      description: Do replace Start-up value for Kelvin [0]
+      required: false
+      default: 0
+      example: 250
+    start_level:
+      name: Start-up Brightness
+      description: Do replace Start-up value for Brightness [0]
+      required: false
+      default: 0
+      example: 60
 
   sequence:
     - variables:
@@ -35,6 +48,19 @@ switch_and_light:
         brightness: "{{ brightness | default(0) }}"
         brightness_pct: "{{ iif( brightness > 0, brightness, state_attr(adaptive_lighting, 'brightness_pct') | int(0) ) }}"
         color_temp_kelvin: "{{ state_attr(adaptive_lighting, 'color_temp_kelvin') | int(0) }}"
+        # start-up
+        light_kelvin: |
+          {% set res = namespace(list=[]) %}
+          {% for li in lights %}
+          {%   set res.list = res.list + device_entities(device_id(li)) | select('search', 'start_up_color_temperature') | list %}
+          {% endfor %}
+          {{ res.list }}
+        light_level: |
+          {% set res = namespace(list=[]) %}
+          {% for li in lights %}
+          {%   set res.list = res.list + device_entities(device_id(li)) | select('search', 'start_up_current_level') | list %}
+          {% endfor %}
+          {{ res.list }}
 
     - service: logbook.log
       data:
@@ -90,6 +116,34 @@ switch_and_light:
                 transition: "{{transition}}"
       # disable
       else:
+        # start: kelvin
+        - if:
+            - condition: template
+              value_template: "{{ start_kelvin > 0 }}"
+          then:
+            - service: number.set_value
+              target:
+                entity_id: "{{light_kelvin}}"
+              data:
+                value: "{{start_kelvin}}"
+            - service: logbook.log
+              data:
+                name: SwitchLight
+                message: "Kelvin [{{start_kelvin}} / {{light_kelvin}}]"
+        # start: level
+        - if:
+            - condition: template
+              value_template: "{{ start_level > 0 }}"
+          then:
+            - service: number.set_value
+              target:
+                entity_id: "{{light_level}}"
+              data:
+                value: "{{start_level}}"
+            - service: logbook.log
+              data:
+                name: SwitchLight
+                message: "Brightness [{{start_level}} / {{light_level}}]"
         # lights
         - service: light.turn_off
           target:
@@ -104,5 +158,5 @@ switch_and_light:
             - service: switch.turn_off
               target:
                 entity_id: "{{switch_on}}"
-                
+
   mode: single
