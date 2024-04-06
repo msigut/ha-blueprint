@@ -13,27 +13,24 @@ switch_and_light:
     brightness:
       name: Brightness
       description: Brightness empowered for on [0]
-      required: false
-      default: 0
       example: 80
     start_kelvin:
       name: Start-up Kelvin
-      description: Do replace Start-up value for Kelvin [0]
-      required: false
-      default: 0
+      description: Do replace Start-up value for Kelvin [250] ; (Ikea 250, Philips Hue 153)
       example: 250
     start_level:
       name: Start-up Brightness
-      description: Do replace Start-up value for Brightness [0]
-      required: false
-      default: 0
-      example: 60
+      description: Do replace Start-up value for Brightness [50]
+      example: 50
 
   sequence:
     - variables:
         # main
         transition: 1
-        adaptive_lighting: "{{ states.switch | map(attribute='entity_id') | select('search', 'adaptive_lighting') | reject('search', '_update') | reject('search', '_mode') | reject('search', '_color') | reject('search', '_brightness') | list | first | default('') }}"
+        # default values
+        brightness: "{{ brightness | default(0) }}"
+        start_kelvin: "{{ start_kelvin  | default(250) }}"
+        start_level: "{{ start_level | default(50) }}"
         # switches
         switch_on: "{{ states.switch | selectattr('entity_id', 'in', switches) | selectattr('state','eq','on') | map(attribute='entity_id') | list }}"
         switch_off: "{{ states.switch | selectattr('entity_id', 'in', switches) | selectattr('state','eq','off') | map(attribute='entity_id') | list }}"
@@ -45,7 +42,7 @@ switch_and_light:
         light_on_count: "{{ light_on | count }}"
         light_off_count: "{{ light_off | count }}"
         # brightness
-        brightness: "{{ brightness | default(0) }}"
+        adaptive_lighting: "{{ states.switch | map(attribute='entity_id') | select('search', 'adaptive_lighting') | reject('search', '_update') | reject('search', '_mode') | reject('search', '_color') | reject('search', '_brightness') | list | first | default('') }}"
         brightness_pct: "{{ iif( brightness > 0, brightness, state_attr(adaptive_lighting, 'brightness_pct') | int(0) ) }}"
         color_temp_kelvin: "{{ state_attr(adaptive_lighting, 'color_temp_kelvin') | int(0) }}"
         # start-up
@@ -65,7 +62,7 @@ switch_and_light:
     - service: logbook.log
       data:
         name: SwitchLight
-        message: "Switch [{{switch_on_count}} / {{switch_off_count}}] | Light [{{light_on_count}} / {{light_off_count}}]"
+        message: "Switch [on: {{switch_on_count}} / off:{{switch_off_count}}] | Light [on:{{light_on_count}} / off:{{light_off_count}}] | AL Brightness [{{brightness_pct}}] | AL Kelvin [{{color_temp_kelvin}}] | Start Kelvin [{{start_kelvin}} / {{light_kelvin | count}}] | Start Brightness [{{start_level}} / {{light_level | count}}]"
 
     # enable
     - if:
@@ -103,10 +100,6 @@ switch_and_light:
                 kelvin: "{{color_temp_kelvin}}"
                 brightness_pct: "{{brightness_pct}}"
                 transition: "{{transition}}"
-            - service: logbook.log
-              data:
-                name: SwitchLight
-                message: "Brightness [{{brightness_pct}}] | Kelvin [{{color_temp_kelvin}}]"
           # common enable
           else:
             - service: light.turn_on
@@ -126,10 +119,6 @@ switch_and_light:
                 entity_id: "{{light_kelvin}}"
               data:
                 value: "{{start_kelvin}}"
-            - service: logbook.log
-              data:
-                name: SwitchLight
-                message: "Kelvin [{{start_kelvin}} / {{light_kelvin}}]"
         # start: level
         - if:
             - condition: template
@@ -140,10 +129,6 @@ switch_and_light:
                 entity_id: "{{light_level}}"
               data:
                 value: "{{start_level}}"
-            - service: logbook.log
-              data:
-                name: SwitchLight
-                message: "Brightness [{{start_level}} / {{light_level}}]"
         # lights
         - service: light.turn_off
           target:
