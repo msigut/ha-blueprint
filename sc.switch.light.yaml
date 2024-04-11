@@ -67,7 +67,7 @@ switch_and_light:
     # enable
     - if:
         - condition: template
-          value_template: "{{ light_off_count > 0 }}"
+          value_template: "{{ switch_off_count > 0 }}"
       then:
         # switch
         - if:
