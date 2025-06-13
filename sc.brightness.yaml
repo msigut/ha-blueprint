@@ -1,0 +1,47 @@
+alias: Set brightness percent down
+description: Set brightness percent down with minimum by step for given lights
+fields:
+  lights:
+    name: Lights
+    description: All my lights to set brigtness perc down
+    required: true
+  minimum:
+    name: Minimum brightness
+    description: Minimum brightness empowered for on [10]
+    example: 30
+  step:
+    name: Brightness step
+    description: Brightness step down [-10]
+    example: -20
+  transition:
+    name: Transition time in seconds
+    description: Transition time in seconds [0.5]
+    example: 1
+sequence:
+  - variables:
+      transition: "{{ transition | default(0.5) }}"
+      minimum: "{{ minimum | default(10) }}"
+      step: "{{ step | default(-10) }}"
+      light_on: >-
+        {{ states.light | selectattr('entity_id', 'in', lights) |
+        selectattr('state','eq','on') | map(attribute='entity_id') | list }}
+  - repeat:
+      for_each: "{{light_on}}"
+      sequence:
+        - variables:
+            brightness: "{{state_attr(repeat.item, 'brightness')|int(0)*100//255}}"
+            brightness_step: "{{iif(brightness <= minimum, 0, step)}}"
+        - data:
+            name: LightBrightness
+            message: >-
+              Light [on:{{light_on}}] | Min [{{minimum}}] | Step [{{step}}] |
+              Transition [{{transition}}] | Britness [{{brightness}}] | Britness
+              step [{{brightness_step}}]
+          action: logbook.log
+        - target:
+            entity_id: "{{repeat.item}}"
+          data:
+            brightness_step_pct: "{{brightness_step}}"
+            transition: "{{transition}}"
+          action: light.turn_on
+mode: single
