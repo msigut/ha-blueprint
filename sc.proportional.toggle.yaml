@@ -1,0 +1,31 @@
+alias: Proportional Toggle
+fields:
+  area_name:
+    name: Area Name
+    description: The name of the Area
+    required: true
+    example: office
+sequence:
+  - variables:
+      entities: "{{ area_entities(area_name) }}"
+      count_on: >
+        {{ states.light | selectattr('entity_id', 'in', entities) |
+        selectattr('state','eq','on') | list | count }}
+      count_off: >
+        {{ states.light | selectattr('entity_id','in', entities) |
+        selectattr('state','eq','off') | list | count }}
+  - if:
+      - condition: template
+        value_template: "{{count_on >= count_off}}"
+    then:
+      - data: {}
+        target:
+          area_id: "{{area_name}}"
+        action: light.turn_off
+    else:
+      - data: {}
+        target:
+          area_id: "{{area_name}}"
+        action: light.turn_on
+mode: single
+icon: mdi:ceiling-light-outline

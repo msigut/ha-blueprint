@@ -1,0 +1,49 @@
+alias: Speak at Volume
+description: Set volume say message and set original volume again back
+fields:
+  message:
+    name: Message
+    description: Message to speak
+    example: Hello World!
+    required: true
+  speaker:
+    name: Speaker
+    description: Speaker name for speaking
+    example: media_player.kamera_obyvak_speaker
+    required: true
+    selector:
+      entity:
+        domain: media_player
+  volume:
+    name: Volume
+    description: Volume level for speaking
+    example: "0.6"
+variables:
+  volume: "{{ volume | default(0.6) }}"
+  volume_orig: "{{ float(state_attr(speaker, 'volume_level'), 0) }}"
+sequence:
+  - data:
+      entity_id: "{{ speaker }}"
+      volume_level: "{{ volume }}"
+    action: media_player.volume_set
+  - data:
+      name: SpeakAtVolume
+      message: Original [{{volume_orig}}] | Volume for speaking [{{volume}}]
+    action: logbook.log
+  - data:
+      cache: true
+      message: "{{ message }}"
+      media_player_entity_id: "{{ speaker }}"
+      options:
+        voice: cs_CZ-jirka-medium
+        preferred_format: wav
+        preferred_sample_rate: 22050
+    target:
+      entity_id: tts.piper
+    action: tts.speak
+  - delay: "00:00:05"
+  - data:
+      entity_id: "{{ speaker }}"
+      volume_level: "{{ volume_orig }}"
+    action: media_player.volume_set
+mode: single
