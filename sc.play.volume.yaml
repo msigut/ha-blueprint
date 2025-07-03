@@ -1,0 +1,126 @@
+alias: Play at Volume
+description: Set volume say message and set original volume again back; support repeats on media and check status of given alarm entity. When changed, playing is stopped. Version 1.0.1
+fields:
+  media:
+    name: Media file
+    description: Media file to play
+    example: http://192.168.1.13:8123/local/community/sounds/clock.15.sec.v4.mp3
+  final:
+    name: Final media file
+    description: Final media file to play
+    example: http://192.168.1.13:8123/local/community/sounds/bell.10.sec.mp3
+  speaker:
+    name: Speaker
+    description: Speaker name for speaking
+    example: media_player.kamera_obyvak_speaker
+    required: true
+    selector:
+      entity:
+        domain: media_player
+  alarm:
+    name: Alarm Panel
+    description: "Select an alarm panel entity [alarm_control_panel.alarmo]"
+    selector:
+      entity:
+        domain: alarm_control_panel
+  volume:
+    name: Volume
+    description: "Volume level to play [0.6]"
+    example: "0.6"
+  count:
+    name: Count of repeat
+    description: Number of repeats
+    example: 2
+  note:
+    name: Note for logs
+    description: Note or identification for logs
+
+variables:
+  media: "{{ media | default('') | trim }}"
+  final: "{{ final | default('') | trim }}"
+  alarm: "{{ alarm | default('alarm_control_panel.alarmo') | trim }}"
+  volume: "{{ volume | default(0.6) }}"
+  volume_orig: "{{ float(state_attr(speaker, 'volume_level'), 0) }}"
+  count: "{{ count | default(1) }}"
+
+sequence:
+  # original volume level
+  - action: media_player.volume_set
+    data:
+      entity_id: "{{ speaker }}"
+      volume_level: "{{ volume }}"
+
+  # state
+  - variables:
+      state_orig: "{{ states(alarm) | default('') }}"
+
+  - action: logbook.log
+    data:
+      name: PlayAtVolume
+      message: >-
+        Volume [{{volume}}] | Media [{{media}}] | Final [{{final}}] | Repeat [{{count}}] | Note [{{note}}] | Given state [{{state_orig}}]
+
+  # repeat N-times to play main media
+  - repeat:
+      count: "{{ count }}"
+      sequence:
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: >
+                    {{ is_state(alarm, state_orig) and (media | length > 0) }}
+              sequence:
+                - data:
+                    name: PlayAtVolume
+                    message: Media [{{ media }}] | Note [{{ note }}]
+                  action: logbook.log
+                - target:
+                    entity_id: "{{ speaker }}"
+                  data:
+                    media_content_id: "{{ media }}"
+                    media_content_type: music
+                  action: media_player.play_media
+                - delay: "00:00:01"
+                - wait_template: >
+                    {{ is_state(speaker, 'paused') or is_state(speaker, 'idle') or not is_state(alarm, state_orig) }}
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ not is_state(speaker, 'paused') and not is_state(speaker, 'idle') }}"
+        sequence:
+          - target:
+              entity_id: "{{ speaker }}"
+            action: media_player.media_stop
+
+  # when final media is defined, play at the end
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ (final | length) > 0 }}"
+        sequence:
+          - action: logbook.log
+            data:
+              name: PlayAtVolume
+              message: Final [{{final}}] | Note [{{note}}]
+          - target:
+              entity_id: "{{ speaker }}"
+            data:
+              media_content_id: "{{ final }}"
+              media_content_type: music
+            action: media_player.play_media
+          - delay: "00:00:01"
+          - wait_template: |
+              {{ is_state(speaker, 'paused') or is_state(speaker, 'idle') }}
+
+  # back original volume
+  - action: media_player.volume_set
+    data:
+      entity_id: "{{ speaker }}"
+      volume_level: "{{ volume_orig }}"
+
+  - action: logbook.log
+    data:
+      name: PlayAtVolume
+      message: Original volume [{{volume_orig}}] | Note [{{note}}]
+
+mode: single
